@@ -15,6 +15,21 @@ func e(src, name, amount string) model.DriverEarning {
 	return model.DriverEarning{Name: name, Amount: m, Source: src}
 }
 
+// rules is a test Rules: aliases by Key, excluded keys.
+type rules struct {
+	aliases  map[string]string
+	excluded map[string]bool
+}
+
+func (r rules) Canonical(name string) string {
+	if main, ok := r.aliases[Key(name)]; ok {
+		return main
+	}
+	return name
+}
+
+func (r rules) Excluded(name string) bool { return r.excluded[Key(name)] }
+
 func TestKey(t *testing.T) {
 	for _, s := range []string{"Jan Kowalski", "  JAN   KOWALSKI ", "jan\tkowalski"} {
 		if got := Key(s); got != "jan kowalski" {
@@ -31,7 +46,7 @@ func TestMergeAcrossSources(t *testing.T) {
 		e(model.SourceBolt, "ADAM NOWAK", "-6.77"),
 		e(model.SourceFreenow, "Old Driver", "0.00"),
 		e(model.SourceUber, "Firm Account", "-126648.63"),
-	}, func(key string) bool { return key == "firm account" })
+	}, rules{excluded: map[string]bool{"firm account": true}})
 
 	if len(warnings) != 0 {
 		t.Errorf("unexpected warnings: %v", warnings)
@@ -72,5 +87,28 @@ func TestMergeDuplicates(t *testing.T) {
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "Ivan Petrov") || !strings.HasPrefix(warnings[0], "Bolt") {
 		t.Errorf("warnings = %v", warnings)
+	}
+}
+
+func TestMergeAliases(t *testing.T) {
+	r := rules{
+		aliases:  map[string]string{"amal abbasov": "Amal Abasov", "firm acc": "Firm Account"},
+		excluded: map[string]bool{"firm account": true},
+	}
+	rows, warnings := Merge([]model.DriverEarning{
+		e(model.SourceUber, "Amal Abbasov", "968.61"),
+		e(model.SourceBolt, "AMAL ABASOV", "650.23"),
+		e(model.SourceUber, "FIRM ACC", "-100.00"), // alias of an excluded account
+	}, r)
+
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("got %d rows, want 1: %+v", len(rows), rows)
+	}
+	got := rows[0]
+	if got.Name != "Amal Abasov" || got.Amounts[model.SourceUber] != 96861 || got.Amounts[model.SourceBolt] != 65023 {
+		t.Errorf("row = %+v", got)
 	}
 }

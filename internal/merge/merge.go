@@ -22,10 +22,19 @@ func Key(name string) string {
 	return strings.ToLower(strings.Join(strings.Fields(name), " "))
 }
 
-// Merge sums earnings per driver and source. Drivers for which exclude(key)
-// is true are dropped, as are drivers with zero in every source.
+// Rules maps alternative spellings to the main name and tells which
+// accounts to leave out of the report.
+type Rules interface {
+	// Canonical returns the main name for an alias, or name unchanged.
+	Canonical(name string) string
+	Excluded(name string) bool
+}
+
+// Merge sums earnings per driver and source. Aliases are resolved to the
+// main name first. Excluded drivers are dropped, as are drivers with zero in
+// every source. rules may be nil.
 // Returns rows sorted by name and warnings about duplicate names.
-func Merge(earnings []model.DriverEarning, exclude func(key string) bool) ([]Row, []string) {
+func Merge(earnings []model.DriverEarning, rules Rules) ([]Row, []string) {
 	type dup struct {
 		count   int
 		nonZero bool
@@ -37,8 +46,11 @@ func Merge(earnings []model.DriverEarning, exclude func(key string) bool) ([]Row
 	var dupOrder [][2]string
 
 	for _, e := range earnings {
+		if rules != nil {
+			e.Name = rules.Canonical(e.Name)
+		}
 		key := Key(e.Name)
-		if key == "" || (exclude != nil && exclude(key)) {
+		if key == "" || (rules != nil && rules.Excluded(e.Name)) {
 			continue
 		}
 		r := byKey[key]

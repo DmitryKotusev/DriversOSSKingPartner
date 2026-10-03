@@ -105,7 +105,7 @@ func run() error {
 				"(создать шаблон: weekpay --init-drivers)", dpath))
 	}
 
-	rows, mwarn := merge.Merge(earnings, drivers.Excluded)
+	rows, mwarn := merge.Merge(earnings, drivers)
 	warnings = append(warnings, mwarn...)
 
 	path := outputPath(*out, week)
