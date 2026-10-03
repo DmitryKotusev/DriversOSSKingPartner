@@ -73,6 +73,17 @@ func TestWrite(t *testing.T) {
 		t.Errorf("K3 formula = %q", formula)
 	}
 
+	// Formula cells carry a precomputed value for viewers that don't
+	// recalculate (phone previews): 1000.10 + 200.05 + 300.33 − 230 − 600.
+	for c, want := range map[string]string{"K2": "-245.25", "K3": "670.48", "K4": "425.23", "D4": "285.08"} {
+		if got, _ := f.GetCellValue(SheetReport, c, excelize.Options{RawCellValue: true}); got != want {
+			t.Errorf("cached %s = %q, want %q", c, got, want)
+		}
+		if typ, _ := f.GetCellType(SheetReport, c); typ != excelize.CellTypeUnset && typ != excelize.CellTypeNumber {
+			t.Errorf("cached %s has type %v, want number", c, typ)
+		}
+	}
+
 	// Simulate manual edits of columns G–J, then recalculate.
 	_ = f.SetCellValue(SheetReport, "G3", 50)  // bonus +
 	_ = f.SetCellValue(SheetReport, "H3", 100) // ZUS −

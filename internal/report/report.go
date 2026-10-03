@@ -78,6 +78,9 @@ func Write(path string, in Input) error {
 	return nil
 }
 
+// writeReport fills the main sheet. Formula cells also get their computed
+// value: viewers that do not recalculate (phone previews, Quick Look) show
+// that value, Excel recalculates on open anyway.
 func writeReport(f *excelize.File, in Input) error {
 	s := SheetReport
 	header, _ := f.NewStyle(&excelize.Style{
@@ -92,63 +95,75 @@ func writeReport(f *excelize.File, in Input) error {
 	totalMoney, _ := f.NewStyle(&excelize.Style{CustomNumFmt: strPtr(moneyFormat), Font: &excelize.Font{Bold: true},
 		Border: []excelize.Border{{Type: "top", Color: "#000000", Style: 1}}})
 
-	hdr := make([]any, len(Headers))
-	for i, h := range Headers {
-		hdr[i] = h
-	}
-	if err := f.SetSheetRow(s, "A1", &hdr); err != nil {
-		return err
-	}
-	_ = f.SetCellStyle(s, "A1", "K1", header)
-	_ = f.SetRowHeight(s, 1, 32)
-
-	for i, r := range in.Rows {
-		row := i + 2
-		values := []any{
-			r.Name,
-			r.Amounts[model.SourceUber].Float(),
-			r.Amounts[model.SourceFreenow].Float(),
-			r.Amounts[model.SourceBolt].Float(),
-			fee(in.Fees, r.Name).Float(),
-			rent(in.Fees, r.Name).Float(),
-			0, 0, 0, 0,
-		}
-		if err := f.SetSheetRow(s, cell("A", row), &values); err != nil {
-			return err
-		}
-		if err := f.SetCellFormula(s, cell("K", row), PayoutFormula(row)); err != nil {
-			return err
-		}
-	}
-
+	// Sheet settings must be in place before the stream writer takes over the sheet.
 	last := len(in.Rows) + 1
 	if last >= 2 {
-		_ = f.SetCellStyle(s, "B2", cell("J", last), money)
-		_ = f.SetCellStyle(s, "K2", cell("K", last), payout)
 		if err := stripeRows(f, s, "A2:"+cell("K", last)); err != nil {
+			return err
+		}
+	}
+
+	sw, err := f.NewStreamWriter(s)
+	if err != nil {
+		return err
+	}
+	// Panes and widths must be set before the first row.
+	if err := sw.SetPanes(&excelize.Panes{Freeze: true, XSplit: 1, YSplit: 1, TopLeftCell: "B2", ActivePane: "bottomRight"}); err != nil {
+		return err
+	}
+	_ = sw.SetColWidth(1, 1, 30)
+	_ = sw.SetColWidth(2, len(Headers), 13)
+
+	hdr := make([]any, len(Headers))
+	for i, h := range Headers {
+		hdr[i] = excelize.Cell{Value: h, StyleID: header}
+	}
+	if err := sw.SetRow("A1", hdr, excelize.RowOpts{Height: 32}); err != nil {
+		return err
+	}
+
+	// Column totals B..K, as cached values of the totals row.
+	totals := make([]model.Money, len(Headers)-1)
+	for i, r := range in.Rows {
+		row := i + 2
+		amounts := []model.Money{
+			r.Amounts[model.SourceUber],
+			r.Amounts[model.SourceFreenow],
+			r.Amounts[model.SourceBolt],
+			fee(in.Fees, r.Name),
+			rent(in.Fees, r.Name),
+			0, 0, 0, 0, // bonus, ZUS, debt, terminal: filled in by hand
+		}
+		// Same as PayoutFormula with the manual columns at 0.
+		pay := amounts[0] + amounts[1] + amounts[2] - amounts[3] - amounts[4]
+
+		values := []any{r.Name}
+		for j, a := range amounts {
+			values = append(values, excelize.Cell{Value: a.Float(), StyleID: money})
+			totals[j] += a
+		}
+		values = append(values, excelize.Cell{Formula: PayoutFormula(row), Value: pay.Float(), StyleID: payout})
+		totals[len(totals)-1] += pay
+		if err := sw.SetRow(cell("A", row), values); err != nil {
 			return err
 		}
 	}
 
 	// Totals row; formulas so that manual edits are reflected.
 	total := last + 1
-	_ = f.SetCellValue(s, cell("A", total), "Итого")
-	for _, col := range []string{"B", "C", "D", "E", "F", "G", "H", "I", "J", "K"} {
+	values := []any{excelize.Cell{Value: "Итого", StyleID: totalName}}
+	for j, t := range totals {
+		col, _ := excelize.ColumnNumberToName(j + 2)
 		formula := "0"
 		if last >= 2 {
 			formula = fmt.Sprintf("SUM(%s2:%s%d)", col, col, last)
 		}
-		if err := f.SetCellFormula(s, cell(col, total), formula); err != nil {
-			return err
-		}
+		values = append(values, excelize.Cell{Formula: formula, Value: t.Float(), StyleID: totalMoney})
 	}
-	_ = f.SetCellStyle(s, cell("A", total), cell("A", total), totalName)
-	_ = f.SetCellStyle(s, cell("B", total), cell("K", total), totalMoney)
-
-	_ = f.SetColWidth(s, "A", "A", 30)
-	_ = f.SetColWidth(s, "B", "K", 13)
-	_ = f.SetPanes(s, &excelize.Panes{Freeze: true, XSplit: 1, YSplit: 1, TopLeftCell: "B2", ActivePane: "bottomRight"})
-	return nil
+	if err := sw.SetRow(cell("A", total), values); err != nil {
+		return err
+	}
+	return sw.Flush()
 }
 
 // stripeRows shades every other row with a light fill. It is a conditional
