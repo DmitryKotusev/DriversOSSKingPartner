@@ -107,6 +107,19 @@
 ### 2.4 Решение: по умолчанию — файлы
 **Основной режим для всех трёх источников — скачанные файлы** (Uber CSV, FREE NOW zip, Bolt CSV). API добавляем позже как опцию для каждого источника, где это возможно (FREE NOW — уже проверено; Bolt — внутренний API портала; Uber — если дадут доступ). Если API сломается, программа просто возвращается к файлам.
 
+## 2.5 Текущее состояние (2026-10-03)
+
+- **Secrets.txt** (в `.gitignore`), формат `KEY=value`: `LOGIN`, `PASSWORD` (общие, одинаковые для всех порталов), `FREENOW_LOGIN`, `FREENOW_PASSWORD`, `BOLT_CLIENT_ID`, `BOLT_CLIENT_SECRET`, `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`. Пока программа может читать этот файл; переход на `secrets.yaml` — по желанию.
+- **Uber API:** в developer.uber.com создано приложение «pensja tygodniowa» (Client ID `GDpnM5XwLYShuKuvGMPRHPa2nGZ17JAn`). Ключи валидны, но на все supplier-scopes `login.uber.com` отвечает `invalid_scope`. 2026-10-03 через чат поддержки Fleet Hub отправлен запрос на `solutions.suppliers.reports` и `org_id`; ждём ответа (почта / «Вхідні повідомлення»). Когда ответят — повторить запрос токена client_credentials с этим scope.
+- **Bolt API:** ключи рабочие, `company_id = 77823`.
+- **FREE NOW API:** вход по `FREENOW_LOGIN`/`FREENOW_PASSWORD` работает.
+- **Образцы за неделю 21–27.09.2026 в `samples/`** (в `.gitignore`, содержат персональные данные):
+  - `20260921_20260928_payments_driver_THE_KING_SPKA_Z_OGRANICZON_ODPOWIEDZIALNOCI.csv` — Uber;
+  - `earnings_2026-09-21_2026-09-27.zip` — FREE NOW;
+  - `Zarobki na kierowcę-2026W39-The King Sp_ z o_o_.csv` — Bolt.
+  Их удобно использовать как тестовые данные (эталонные суммы: Uber — скриншоты «Дохід», FREE NOW — 12 ненулевых водителей, Bolt — «Przewidywana wypłata»).
+- Код ещё не начат. Следующий шаг — этап 1 (ядро) и этап 2 (импорт файлов).
+
 ## 3. Архитектура (Go, консоль)
 
 ```
