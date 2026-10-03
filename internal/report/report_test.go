@@ -62,6 +62,12 @@ func TestWrite(t *testing.T) {
 		t.Errorf("header = %v", hdr[0])
 	}
 
+	// Every other data row is striped via a conditional format.
+	cf, _ := f.GetConditionalFormats(SheetReport)
+	if opts := cf["A2:K3"]; len(opts) != 1 || opts[0].Type != "formula" || opts[0].Criteria != "MOD(ROW(),2)=1" {
+		t.Errorf("conditional formats = %+v", cf)
+	}
+
 	// Column K is a formula, not a number.
 	if formula, _ := f.GetCellFormula(SheetReport, "K3"); formula != PayoutFormula(3) {
 		t.Errorf("K3 formula = %q", formula)

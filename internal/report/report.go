@@ -125,6 +125,9 @@ func writeReport(f *excelize.File, in Input) error {
 	if last >= 2 {
 		_ = f.SetCellStyle(s, "B2", cell("J", last), money)
 		_ = f.SetCellStyle(s, "K2", cell("K", last), payout)
+		if err := stripeRows(f, s, "A2:"+cell("K", last)); err != nil {
+			return err
+		}
 	}
 
 	// Totals row; formulas so that manual edits are reflected.
@@ -146,6 +149,20 @@ func writeReport(f *excelize.File, in Input) error {
 	_ = f.SetColWidth(s, "B", "K", 13)
 	_ = f.SetPanes(s, &excelize.Panes{Freeze: true, XSplit: 1, YSplit: 1, TopLeftCell: "B2", ActivePane: "bottomRight"})
 	return nil
+}
+
+// stripeRows shades every other row with a light fill. It is a conditional
+// format, so stripes stay correct after sorting or inserting rows.
+func stripeRows(f *excelize.File, sheet, rangeRef string) error {
+	fill, err := f.NewConditionalStyle(&excelize.Style{
+		Fill: excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"#F2F2F2"}},
+	})
+	if err != nil {
+		return err
+	}
+	return f.SetConditionalFormat(sheet, rangeRef, []excelize.ConditionalFormatOptions{
+		{Type: "formula", Criteria: "MOD(ROW(),2)=1", Format: &fill},
+	})
 }
 
 var numberRe = regexp.MustCompile(`^-?(0|[1-9][0-9]*)(\.[0-9]+)?$`)
