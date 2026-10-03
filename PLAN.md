@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | Uber | fleethub.uber.com → Earnings | «период расчёта» Uber: пн ~04:00 → пн ~04:00 (появляется в пн около 4 утра) | «Ім'я водія» | «Чистий дохід» |
 | FREE NOW | portal.free-now.com → Earnings | пн–вс (календарные дни) | «Водій» | «Замовлення від Freenow» |
-| Bolt | fleets.bolt.eu → Finances → Driver earnings | «Ostatnie 7 dni» (пн–вс) | «Kierowca» | «Zarobki netto» − «Pobrana gotówka» |
+| Bolt | fleets.bolt.eu → Finanse → Zarobki na kierowcę | «Ostatni tydzień» (пн–вс) | «Kierowca» | «Zarobki netto» − «Pobrana gotówka» |
 
 ### Итоговая таблица (Excel)
 
@@ -84,7 +84,7 @@
   - **главное:** бонусы кампаний («Zarobki z kampanii», за эту неделю **10 630 zł**) и сбор «Inne opłaty» (6,77 zł) в API **отсутствуют**. Без них итог у отдельных водителей расходится до 848 zł. Поэтому официальный API для расчёта выплат **не используем** (максимум — для контроля).
 
 **Что используем вместо него:**
-1. **Сейчас (MVP): CSV «Pobierz → Zarobki na kierowcę».** Формат: UTF-8 с BOM, разделитель `,`, точка в дробях. Колонки «Kierowca», «Zarobki netto|ZŁ», «Pobrana gotówka|ZŁ» и готовая **«Przewidywana wypłata|ZŁ»**, которая **ровно равна** «Zarobki netto − Pobrana gotówka» (проверено у всех 73). Её и берём.
+1. **Сейчас (MVP): CSV «Pobierz → Zarobki na kierowcę».** Формат: UTF-8 с BOM, разделитель `,`, точка в дробях. Сумма водителя считается **по формуле жены: «Zarobki netto|ZŁ» − «Pobrana gotówka|ZŁ»** (подтверждено скриншотом портала, 15/15 водителей совпали с CSV). Колонка «Przewidywana wypłata|ZŁ» в файле равна этой разнице у всех 73 водителей — используем её только как контроль: если вдруг разойдётся, выводим предупреждение.
 2. **Позже: внутренний API портала `fleets.bolt.eu`.** В бандле портала есть `/fleetOwnerPortal/driverEarnings/getTable`, `…/getCsv`, `…/getSummary`. Вход: `startAuthentication` → одноразовый код (`getOtpForm`/`submitOtpForm`) → `getAccessToken` по refresh-токену. То есть код с почты/телефона нужен только при первом входе и когда протухнет refresh-токен; срок его жизни проверим отдельно.
 
 ### 2.3 Uber: официальный Suppliers API есть, но доступ не самообслуживаемый
