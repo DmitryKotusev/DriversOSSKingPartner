@@ -21,8 +21,9 @@ const (
 	colPaid      = "Wypłacono Ci"
 )
 
-// fileRe matches e.g. "20260921_20260928_payments_driver_<company>.csv".
-var fileRe = regexp.MustCompile(`^(\d{8})_(\d{8})_payments_driver_.*\.csv$`)
+// fileRe matches e.g. "20260921_20260928_payments_driver_<company>.csv";
+// the file may also come with hyphens: "20260921-20260928-payments_driver-<company>.csv".
+var fileRe = regexp.MustCompile(`^(\d{8})[_-](\d{8})[_-]payments_driver[_-].*\.csv$`)
 
 // CSV is the Uber source backed by a downloaded report file.
 type CSV struct{ Path string }
@@ -79,9 +80,10 @@ func Parse(r io.Reader) (*sources.Data, error) {
 
 // FindFile looks for the newest report for week w in dir. Returns "" if none.
 func FindFile(dir string, w model.Week) (string, error) {
-	prefix := w.Start.Format("20060102") + "_" + w.Start.AddDate(0, 0, 7).Format("20060102") + "_"
+	start, end := w.Start.Format("20060102"), w.Start.AddDate(0, 0, 7).Format("20060102")
 	return sources.FindNewest(dir, func(name string) bool {
-		return strings.HasPrefix(name, prefix) && fileRe.MatchString(name)
+		m := fileRe.FindStringSubmatch(name)
+		return m != nil && m[1] == start && m[2] == end
 	})
 }
 

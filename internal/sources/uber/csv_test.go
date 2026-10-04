@@ -67,6 +67,27 @@ func TestFetchAndFind(t *testing.T) {
 	}
 }
 
+func TestFindHyphenatedName(t *testing.T) {
+	dir := t.TempDir()
+	good := filepath.Join(dir, "20260921-20260928-payments_driver-FIRM.csv")
+	other := filepath.Join(dir, "20260914-20260921-payments_driver-FIRM.csv")
+	for _, p := range []string{good, other} {
+		if err := os.WriteFile(p, []byte(sample), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, _ := FindFile(dir, week); got != good {
+		t.Errorf("FindFile = %q", got)
+	}
+	d, err := (CSV{Path: good}).Fetch(context.Background(), week)
+	if err != nil || len(d.Warnings) != 0 {
+		t.Errorf("warnings=%v err=%v", d.Warnings, err)
+	}
+	if _, err := (CSV{Path: other}).Fetch(context.Background(), week); err == nil {
+		t.Error("expected period mismatch error")
+	}
+}
+
 func TestRealSample(t *testing.T) {
 	path := "../../../samples/20260921_20260928_payments_driver_THE_KING_SPKA_Z_OGRANICZON_ODPOWIEDZIALNOCI.csv"
 	if _, err := os.Stat(path); err != nil {
