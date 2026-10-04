@@ -31,10 +31,12 @@ const ColTotal = "Итог (Zarobki netto − Pobrana gotówka)"
 // The export's file name tells its period. "Ostatni tydzień" gives the ISO
 // week: "Zarobki na kierowcę-2026W39-<company>.csv"; a custom period gives
 // dates with Polish month abbreviations:
-// "Zarobki_na_kierowcę_14_wrz_2026_20_wrz_2026_<company>.csv".
+// "Zarobki na kierowcę-14 wrz 2026-20 wrz 2026-<company>.csv".
+// Copying the file between computers may turn spaces and hyphens into
+// underscores, so any of the three is accepted as a separator.
 var (
-	weekRe  = regexp.MustCompile(`-(\d{4})W(\d{2})-.*\.csv$`)
-	rangeRe = regexp.MustCompile(`^Zarobki_na_kierowc[eę]_(\d{1,2})_(\pL+)_(\d{4})_(\d{1,2})_(\pL+)_(\d{4})(?:[_ ].*)?\.csv$`)
+	weekRe  = regexp.MustCompile(`[-_ ](\d{4})W(\d{2})[-_ ].*\.csv$`)
+	rangeRe = regexp.MustCompile(`^Zarobki[-_ ]na[-_ ]kierowc[eę][-_ ]+(\d{1,2})[-_ ](\pL+)[-_ ](\d{4})[-_ ]+(\d{1,2})[-_ ](\pL+)[-_ ](\d{4})(?:[-_ ].*)?\.csv$`)
 )
 
 // months are the Polish month abbreviations used in file names, January first.
@@ -200,9 +202,9 @@ func ExpectedName(w model.Week) string {
 		return fmt.Sprintf("Zarobki na kierowcę-%dW%02d-<фирма>.csv", year, week)
 	}
 	date := func(t time.Time) string {
-		return fmt.Sprintf("%d_%s_%d", t.Day(), months[t.Month()-1], t.Year())
+		return fmt.Sprintf("%d %s %d", t.Day(), months[t.Month()-1], t.Year())
 	}
-	return "Zarobki_na_kierowcę_" + date(w.Start) + "_" + date(w.End) + "_<фирма>.csv"
+	return "Zarobki na kierowcę-" + date(w.Start) + "-" + date(w.End) + "-<фирма>.csv"
 }
 
 // HowToDownload tells where to get the export for week w. The portal's

@@ -67,12 +67,15 @@ func TestFetchAndFind(t *testing.T) {
 
 func TestFilePeriod(t *testing.T) {
 	cases := map[string]string{
-		"Zarobki na kierowcę-2026W39-The King Sp_ z o_o_.csv":                "2026-09-21 2026-09-27",
-		"Zarobki na kierowcę-2026W01-Firm (1).csv":                           "2025-12-29 2026-01-04",
-		"Zarobki_na_kierowcę_14_wrz_2026_20_wrz_2026_The_King_Sp_z_o_o_.csv": "2026-09-14 2026-09-20",
-		"Zarobki_na_kierowcę_29_wrz_2026_5_paź_2026_Firm (1).csv":            "2026-09-29 2026-10-05",
-		"Zarobki_na_kierowcę_28_gru_2026_3_sty_2027.csv":                     "2026-12-28 2027-01-03",
-		"Zarobki_na_kierowcę_14_xyz_2026_20_wrz_2026_Firm.csv":               "",
+		"Zarobki na kierowcę-2026W39-The King Sp_ z o_o_.csv":                 "2026-09-21 2026-09-27",
+		"Zarobki na kierowcę-2026W01-Firm (1).csv":                            "2025-12-29 2026-01-04",
+		"Zarobki_na_kierowcę_14_wrz_2026_20_wrz_2026_The_King_Sp_z_o_o_.csv":  "2026-09-14 2026-09-20",
+		"Zarobki na kierowcę-14 wrz 2026-20 wrz 2026-The King Sp_ z o_o_.csv": "2026-09-14 2026-09-20",
+		"Zarobki na kierowcę-14 wrz 2026-20 wrz 2026-Firm (1).csv":            "2026-09-14 2026-09-20",
+		"Zarobki_na_kierowcę_2026W39_Firm.csv":                                "2026-09-21 2026-09-27",
+		"Zarobki_na_kierowcę_29_wrz_2026_5_paź_2026_Firm (1).csv":             "2026-09-29 2026-10-05",
+		"Zarobki_na_kierowcę_28_gru_2026_3_sty_2027.csv":                      "2026-12-28 2027-01-03",
+		"Zarobki_na_kierowcę_14_xyz_2026_20_wrz_2026_Firm.csv":                "",
 		"report.csv": "",
 	}
 	for name, want := range cases {
@@ -89,7 +92,7 @@ func TestFilePeriod(t *testing.T) {
 
 func TestFindDateRangeFile(t *testing.T) {
 	dir := t.TempDir()
-	good := filepath.Join(dir, "Zarobki_na_kierowcę_21_wrz_2026_27_wrz_2026_Firm.csv")
+	good := filepath.Join(dir, "Zarobki na kierowcę-21 wrz 2026-27 wrz 2026-Firm.csv")
 	longer := filepath.Join(dir, "Zarobki_na_kierowcę_21_wrz_2026_28_wrz_2026_Firm.csv")
 	for _, p := range []string{good, longer} {
 		if err := os.WriteFile(p, []byte(sample), 0o644); err != nil {

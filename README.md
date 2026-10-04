@@ -34,7 +34,7 @@ go test ./...
    |---|---|---|
    | Uber | Fleet Hub → «Звіти» → «Створити звіт» → «Платежі (водій)» | `20260921_20260928_payments_driver_<фирма>.csv` |
    | FREE NOW | portal.free-now.com → Earnings → скачать (zip) | `earnings_2026-09-21_2026-09-27.zip` |
-   | Bolt | fleets.bolt.eu → Finanse → Zarobki na kierowcę → «Ostatni tydzień» → Pobierz | `Zarobki na kierowcę-2026W39-<фирма>.csv`; за произвольный период — `Zarobki_na_kierowcę_21_wrz_2026_27_wrz_2026_<фирма>.csv` |
+   | Bolt | fleets.bolt.eu → Finanse → Zarobki na kierowcę → «Ostatni tydzień» → Pobierz | `Zarobki na kierowcę-2026W39-<фирма>.csv`; за произвольный период — `Zarobki na kierowcę-21 wrz 2026-27 wrz 2026-<фирма>.csv` |
 
 2. Дважды щёлкните ярлык «Выплаты водителям». Программа:
    - берёт прошедшую неделю (пн–вс);
