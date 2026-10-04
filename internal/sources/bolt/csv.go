@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"weekpay/internal/model"
 	"weekpay/internal/sources"
@@ -133,4 +134,27 @@ func FindFile(dir string, w model.Week) (string, error) {
 	return sources.FindNewest(dir, func(name string) bool {
 		return strings.Contains(name, token) && weekRe.MatchString(name)
 	})
+}
+
+// FindAnyFile returns the newest export in dir for any week, "" if none.
+func FindAnyFile(dir string) (string, error) {
+	return sources.FindNewest(dir, weekRe.MatchString)
+}
+
+// ExpectedName is the export file name for week w.
+func ExpectedName(w model.Week) string {
+	year, week := w.Start.ISOWeek()
+	return fmt.Sprintf("Zarobki na kierowcę-%dW%02d-<фирма>.csv", year, week)
+}
+
+// HowToDownload tells where to get the export for week w. The portal's
+// "Ostatni tydzień" is only right when w is the week before today.
+func HowToDownload(w model.Week) string {
+	period := fmt.Sprintf("%s – %s", w.Start.Format("02.01.2006"), w.End.Format("02.01.2006"))
+	if w.Start.Equal(model.PreviousWeek(time.Now()).Start) {
+		period = "«Ostatni tydzień» (" + period + ")"
+	} else {
+		period = "неделя " + period
+	}
+	return "fleets.bolt.eu → Finanse → Zarobki na kierowcę → " + period + " → Pobierz"
 }

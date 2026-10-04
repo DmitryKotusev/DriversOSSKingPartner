@@ -84,3 +84,19 @@ func FindFile(dir string, w model.Week) (string, error) {
 		return strings.HasPrefix(name, prefix) && fileRe.MatchString(name)
 	})
 }
+
+// FindAnyFile returns the newest report in dir for any period, "" if none.
+func FindAnyFile(dir string) (string, error) {
+	return sources.FindNewest(dir, fileRe.MatchString)
+}
+
+// ExpectedName is the report file name for week w.
+func ExpectedName(w model.Week) string {
+	return w.Start.Format("20060102") + "_" + w.Start.AddDate(0, 0, 7).Format("20060102") + "_payments_driver_<фирма>.csv"
+}
+
+// HowToDownload tells where to get the report for week w.
+func HowToDownload(w model.Week) string {
+	return fmt.Sprintf("fleethub.uber.com → «Звіти» → «Створити звіт» → тип «Платежі (водій)», период %s 04:00 – %s 04:00 → скачать",
+		w.Start.Format("02.01.2006"), w.Start.AddDate(0, 0, 7).Format("02.01.2006"))
+}

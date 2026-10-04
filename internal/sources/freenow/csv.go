@@ -113,3 +113,19 @@ func FindFile(dir string, w model.Week) (string, error) {
 		return strings.HasPrefix(name, prefix) && fileRe.MatchString(name)
 	})
 }
+
+// FindAnyFile returns the newest export in dir for any period, "" if none.
+func FindAnyFile(dir string) (string, error) {
+	return sources.FindNewest(dir, fileRe.MatchString)
+}
+
+// ExpectedName is the export file name for week w.
+func ExpectedName(w model.Week) string {
+	return "earnings_" + w.Start.Format("2006-01-02") + "_" + w.End.Format("2006-01-02") + ".zip"
+}
+
+// HowToDownload tells where to get the export for week w.
+func HowToDownload(w model.Week) string {
+	return fmt.Sprintf("portal.free-now.com → Earnings → период %s – %s → скачать (zip)",
+		w.Start.Format("02.01.2006"), w.End.Format("02.01.2006"))
+}
