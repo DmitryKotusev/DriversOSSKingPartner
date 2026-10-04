@@ -3,9 +3,12 @@ package config
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/xuri/excelize/v2"
+
+	"weekpay/internal/model"
 )
 
 func TestLoadDriversMissing(t *testing.T) {
@@ -13,7 +16,7 @@ func TestLoadDriversMissing(t *testing.T) {
 	if err != nil || found {
 		t.Fatalf("found=%v err=%v", found, err)
 	}
-	if d.Fee("Anyone") != 0 || d.Rent("Anyone") != 0 || d.Excluded("Anyone") {
+	if d.Amount(model.PartnerFee, "Anyone") != 0 || d.Amount(model.CarRent, "Anyone") != 0 || d.Excluded("Anyone") {
 		t.Error("missing file must give zeros")
 	}
 }
@@ -34,8 +37,8 @@ func TestLoadDrivers(t *testing.T) {
 	sheet := f.GetSheetName(0)
 	_ = f.SetSheetRow(sheet, "A3", &[]any{"Jan Kowalski", 150, 600})
 	_ = f.SetSheetRow(sheet, "A4", &[]any{"  adam   NOWAK ", nil, 500.5})
-	_ = f.SetSheetRow(sheet, "A5", &[]any{"Firm Account", nil, nil, "да"})
-	_ = f.SetSheetRow(sheet, "A6", &[]any{"Piotr Zielinski", 150.3, nil, "нет"})
+	_ = f.SetSheetRow(sheet, "A5", &[]any{"Firm Account", nil, nil, nil, nil, nil, nil, "да"})
+	_ = f.SetSheetRow(sheet, "A6", &[]any{"Piotr Zielinski", 150.3, nil, nil, nil, nil, nil, "нет"})
 	if err := f.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -57,8 +60,8 @@ func TestLoadDrivers(t *testing.T) {
 		{"Somebody Else", 23000, 0, false},
 	}
 	for _, c := range checks {
-		if int64(d.Fee(c.name)) != c.fee || int64(d.Rent(c.name)) != c.rent || d.Excluded(c.name) != c.excluded {
-			t.Errorf("%s: fee=%v rent=%v excluded=%v", c.name, d.Fee(c.name), d.Rent(c.name), d.Excluded(c.name))
+		if int64(d.Amount(model.PartnerFee, c.name)) != c.fee || int64(d.Amount(model.CarRent, c.name)) != c.rent || d.Excluded(c.name) != c.excluded {
+			t.Errorf("%s: fee=%v rent=%v excluded=%v", c.name, d.Amount(model.PartnerFee, c.name), d.Amount(model.CarRent, c.name), d.Excluded(c.name))
 		}
 	}
 }
@@ -112,7 +115,7 @@ func TestAliases(t *testing.T) {
 			t.Errorf("Canonical(%q) = %q, want %q", in, got, want)
 		}
 	}
-	if d.Fee(d.Canonical("Amal Abbasov")) != 15000 || !d.Excluded(d.Canonical("firm acc")) {
+	if d.Amount(model.PartnerFee, d.Canonical("Amal Abbasov")) != 15000 || !d.Excluded(d.Canonical("firm acc")) {
 		t.Error("fee/exclusion must apply through the main name")
 	}
 }
@@ -139,5 +142,65 @@ func TestDriversWithoutFile(t *testing.T) {
 	d, _, _, _ := LoadDrivers(filepath.Join(t.TempDir(), "nope.xlsx"))
 	if d.Canonical("Jan Kowalski") != "Jan Kowalski" {
 		t.Error("no file → names unchanged")
+	}
+}
+
+func TestManualColumns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "drivers.xlsx")
+	if err := WriteDriversTemplate(path, 23000); err != nil {
+		t.Fatal(err)
+	}
+	f, err := excelize.OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sheet := f.GetSheetName(0)
+	header, _ := f.GetRows(sheet)
+	want := []string{HeaderName, HeaderFee, HeaderRent, HeaderBonus, HeaderZUS, HeaderDebt, HeaderTerminal, HeaderExclude, HeaderAliases}
+	if strings.Join(header[0], "|") != strings.Join(want, "|") {
+		t.Errorf("template header = %v", header[0])
+	}
+	// Defaults: ZUS 50, terminal 5. Jan: own bonus, debt and ZUS 0.
+	_ = f.SetSheetRow(sheet, "A2", &[]any{DefaultRowName, 230, 0, 0, 50, 0, 5})
+	_ = f.SetSheetRow(sheet, "A3", &[]any{"Jan Kowalski", nil, nil, 100, 0, 20.5})
+	if err := f.Save(); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	d, _, _, err := LoadDrivers(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name string
+		a    model.Adjustment
+		want model.Money
+	}{
+		{"Jan Kowalski", model.PartnerFee, 23000},
+		{"Jan Kowalski", model.Bonus, 10000},
+		{"Jan Kowalski", model.ZUS, 0}, // explicit 0 overrides the default
+		{"Jan Kowalski", model.Debt, 2050},
+		{"Jan Kowalski", model.Terminal, 500},
+		{"Adam Nowak", model.Bonus, 0},
+		{"Adam Nowak", model.ZUS, 5000},
+		{"Adam Nowak", model.Terminal, 500},
+	}
+	for _, c := range checks {
+		if got := d.Amount(c.a, c.name); got != c.want {
+			t.Errorf("%s, column %d = %s, want %s", c.name, c.a, got, c.want)
+		}
+	}
+}
+
+func TestOldFileWithoutManualColumns(t *testing.T) {
+	d, _, _, err := LoadDrivers(writeDrivers(t, []any{"Jan Kowalski", 150, 600}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []model.Adjustment{model.Bonus, model.ZUS, model.Debt, model.Terminal} {
+		if d.Amount(a, "Jan Kowalski") != 0 {
+			t.Errorf("column %d must be 0 when absent", a)
+		}
 	}
 }

@@ -11,10 +11,9 @@ import (
 	"weekpay/internal/model"
 )
 
-type fees map[string][2]model.Money
+type adjustments map[string][model.NumAdjustments]model.Money
 
-func (f fees) Fee(n string) model.Money  { return f[n][0] }
-func (f fees) Rent(n string) model.Money { return f[n][1] }
+func (a adjustments) Amount(adj model.Adjustment, n string) model.Money { return a[n][adj] }
 
 func TestPayoutFormula(t *testing.T) {
 	if got, want := PayoutFormula(7), "B7+C7+D7+G7+J7-E7-F7-H7-I7"; got != want {
@@ -38,7 +37,11 @@ func TestWrite(t *testing.T) {
 			{Name: "Jan Kowalski", Amounts: map[string]model.Money{
 				model.SourceUber: 100010, model.SourceFreenow: 20005, model.SourceBolt: 30033}},
 		},
-		Fees: fees{"Jan Kowalski": {23000, 60000}, "Adam Nowak": {23000, 0}},
+		Adjustments: adjustments{
+			"Jan Kowalski": {model.PartnerFee: 23000, model.CarRent: 60000},
+			// fee 230, bonus 100, ZUS 50, debt 20, terminal 10
+			"Adam Nowak": {model.PartnerFee: 23000, model.Bonus: 10000, model.ZUS: 5000, model.Debt: 2000, model.Terminal: 1000},
+		},
 		Raw: map[string]model.Table{
 			model.SourceBolt: {Header: []string{"Kierowca", "Zarobki netto|ZŁ", "Numer telefonu"},
 				Rows: [][]string{{"ADAM NOWAK", "-6.77", "+48111222333"}}},
@@ -74,8 +77,9 @@ func TestWrite(t *testing.T) {
 	}
 
 	// Formula cells carry a precomputed value for viewers that don't
-	// recalculate (phone previews): 1000.10 + 200.05 + 300.33 − 230 − 600.
-	for c, want := range map[string]string{"K2": "-245.25", "K3": "670.48", "K4": "425.23", "D4": "285.08"} {
+	// recalculate (phone previews): K3 = 1000.10 + 200.05 + 300.33 − 230 − 600,
+	// K2 = −15.25 + 100 + 10 − 230 − 50 − 20.
+	for c, want := range map[string]string{"K2": "-205.25", "K3": "670.48", "K4": "465.23", "D4": "285.08", "G2": "100", "H2": "50"} {
 		if got, _ := f.GetCellValue(SheetReport, c, excelize.Options{RawCellValue: true}); got != want {
 			t.Errorf("cached %s = %q, want %q", c, got, want)
 		}
@@ -100,9 +104,8 @@ func TestWrite(t *testing.T) {
 	if got := calc("K3"); got != "615.98" {
 		t.Errorf("K3 = %s, want 615.98", got)
 	}
-	// −15.25 − 230 = −245.25
-	if got := calc("K2"); got != "-245.25" {
-		t.Errorf("K2 = %s, want -245.25", got)
+	if got := calc("K2"); got != "-205.25" {
+		t.Errorf("K2 = %s, want -205.25", got)
 	}
 	if a, _ := f.GetCellValue(SheetReport, "A4"); a != "Итого" {
 		t.Errorf("A4 = %q", a)

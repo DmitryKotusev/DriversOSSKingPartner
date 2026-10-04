@@ -188,7 +188,7 @@ func run(o options) error {
 	rows, mwarn := merge.Merge(earnings, drivers)
 	warnings = append(warnings, mwarn...)
 
-	if err := writeReport(path, report.Input{Week: week, Rows: rows, Fees: drivers, Raw: raw}); err != nil {
+	if err := writeReport(path, report.Input{Week: week, Rows: rows, Adjustments: drivers, Raw: raw}); err != nil {
 		return err
 	}
 

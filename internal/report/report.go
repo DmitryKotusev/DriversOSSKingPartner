@@ -27,17 +27,18 @@ func PayoutFormula(row int) string {
 	return fmt.Sprintf("B%[1]d+C%[1]d+D%[1]d+G%[1]d+J%[1]d-E%[1]d-F%[1]d-H%[1]d-I%[1]d", row)
 }
 
-// Fees gives the partner fee and rent per driver.
-type Fees interface {
-	Fee(name string) model.Money
-	Rent(name string) model.Money
+// Adjustments gives the per-driver amounts of columns E–J
+// (partner fee, rent, bonus, ZUS, debt, terminal).
+type Adjustments interface {
+	Amount(a model.Adjustment, name string) model.Money
 }
 
 // Input is everything that goes into the workbook.
 type Input struct {
 	Week model.Week
 	Rows []merge.Row
-	Fees Fees
+	// Adjustments may be nil: columns E–J are then 0.
+	Adjustments Adjustments
 	// Raw source tables keyed by source name; each becomes its own sheet.
 	Raw map[string]model.Table
 }
@@ -130,12 +131,17 @@ func writeReport(f *excelize.File, in Input) error {
 			r.Amounts[model.SourceUber],
 			r.Amounts[model.SourceFreenow],
 			r.Amounts[model.SourceBolt],
-			fee(in.Fees, r.Name),
-			rent(in.Fees, r.Name),
-			0, 0, 0, 0, // bonus, ZUS, debt, terminal: filled in by hand
 		}
-		// Same as PayoutFormula with the manual columns at 0.
-		pay := amounts[0] + amounts[1] + amounts[2] - amounts[3] - amounts[4]
+		var adj [model.NumAdjustments]model.Money
+		if in.Adjustments != nil {
+			for a := range adj {
+				adj[a] = in.Adjustments.Amount(model.Adjustment(a), r.Name)
+			}
+		}
+		amounts = append(amounts, adj[:]...)
+		// Same as PayoutFormula: B+C+D+G+J − E−F−H−I.
+		pay := amounts[0] + amounts[1] + amounts[2] + adj[model.Bonus] + adj[model.Terminal] -
+			adj[model.PartnerFee] - adj[model.CarRent] - adj[model.ZUS] - adj[model.Debt]
 
 		values := []any{r.Name}
 		for j, a := range amounts {
@@ -219,20 +225,6 @@ func writeRaw(f *excelize.File, name string, t model.Table) error {
 		}
 	}
 	return sw.Flush()
-}
-
-func fee(f Fees, name string) model.Money {
-	if f == nil {
-		return 0
-	}
-	return f.Fee(name)
-}
-
-func rent(f Fees, name string) model.Money {
-	if f == nil {
-		return 0
-	}
-	return f.Rent(name)
 }
 
 func cell(col string, row int) string { return col + strconv.Itoa(row) }

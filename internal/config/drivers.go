@@ -20,26 +20,40 @@ const DefaultRowName = "(по умолчанию)"
 
 // Column headers of drivers.xlsx.
 const (
-	HeaderName    = "Водитель"
-	HeaderFee     = "Партнёрский сбор"
-	HeaderRent    = "Аренда"
-	HeaderExclude = "Не включать"
-	HeaderAliases = "Другие имена"
+	HeaderName     = "Водитель"
+	HeaderFee      = "Партнёрский сбор"
+	HeaderRent     = "Аренда"
+	HeaderBonus    = "Бонус"
+	HeaderZUS      = "ZUS"
+	HeaderDebt     = "Долг"
+	HeaderTerminal = "Терминал"
+	HeaderExclude  = "Не включать"
+	HeaderAliases  = "Другие имена"
 )
 
-type entry struct {
-	fee, rent *model.Money
-	exclude   bool
+// amountColumns are the headers of the amount columns, and the word
+// (lower case) by which each is recognized in the file.
+var amountColumns = [model.NumAdjustments]struct{ header, word string }{
+	model.PartnerFee: {HeaderFee, "сбор"},
+	model.CarRent:    {HeaderRent, "аренд"},
+	model.Bonus:      {HeaderBonus, "бонус"},
+	model.ZUS:        {HeaderZUS, "zus"},
+	model.Debt:       {HeaderDebt, "долг"},
+	model.Terminal:   {HeaderTerminal, "терминал"},
 }
 
-// Drivers holds per-driver partner fee, car rent, accounts to skip and
-// other spellings of driver names. The zero value (no file) gives 0
-// everywhere, skips nobody and has no aliases.
+type entry struct {
+	amounts [model.NumAdjustments]*model.Money // nil: take the default
+	exclude bool
+}
+
+// Drivers holds per-driver amounts (partner fee, car rent, bonus, ZUS,
+// debt, terminal), accounts to skip and other spellings of driver names.
+// The zero value (no file) gives 0 everywhere, skips nobody and has no aliases.
 type Drivers struct {
-	DefaultFee  model.Money
-	DefaultRent model.Money
-	entries     map[string]entry  // by merge.Key
-	aliases     map[string]string // merge.Key of alias → main name
+	Defaults [model.NumAdjustments]model.Money
+	entries  map[string]entry  // by merge.Key
+	aliases  map[string]string // merge.Key of alias → main name
 }
 
 // Canonical returns the main name if name is listed in «Другие имена»,
@@ -51,20 +65,12 @@ func (d *Drivers) Canonical(name string) string {
 	return name
 }
 
-// Fee returns the partner fee for a driver.
-func (d *Drivers) Fee(name string) model.Money {
-	if e, ok := d.entries[merge.Key(name)]; ok && e.fee != nil {
-		return *e.fee
+// Amount returns the driver's own value of a column, or the default.
+func (d *Drivers) Amount(a model.Adjustment, name string) model.Money {
+	if e, ok := d.entries[merge.Key(name)]; ok && e.amounts[a] != nil {
+		return *e.amounts[a]
 	}
-	return d.DefaultFee
-}
-
-// Rent returns the weekly car rent for a driver.
-func (d *Drivers) Rent(name string) model.Money {
-	if e, ok := d.entries[merge.Key(name)]; ok && e.rent != nil {
-		return *e.rent
-	}
-	return d.DefaultRent
+	return d.Defaults[a]
 }
 
 // Excluded reports whether the account must not appear in the report
@@ -95,20 +101,27 @@ func LoadDrivers(path string) (d *Drivers, found bool, warnings []string, err er
 		return d, true, nil, nil
 	}
 
-	nameCol, feeCol, rentCol, exclCol, aliasCol := -1, -1, -1, -1, -1
+	nameCol, exclCol, aliasCol := -1, -1, -1
+	var amountCols [model.NumAdjustments]int
+	for a := range amountCols {
+		amountCols[a] = -1
+	}
 	for i, h := range rows[0] {
 		h = strings.ToLower(strings.TrimSpace(h))
 		switch {
 		case strings.Contains(h, "водител"):
 			nameCol = i
-		case strings.Contains(h, "сбор"):
-			feeCol = i
-		case strings.Contains(h, "аренд"):
-			rentCol = i
 		case strings.Contains(h, "не включать"), strings.Contains(h, "исключ"):
 			exclCol = i
 		case strings.Contains(h, "другие имена"), strings.Contains(h, "алиас"):
 			aliasCol = i
+		default:
+			for a, c := range amountColumns {
+				if strings.Contains(h, c.word) {
+					amountCols[a] = i
+					break
+				}
+			}
 		}
 	}
 	if nameCol < 0 {
@@ -140,21 +153,18 @@ func LoadDrivers(path string) (d *Drivers, found bool, warnings []string, err er
 		if name == "" {
 			continue
 		}
-		fee, err := money(row, feeCol, rowIdx)
-		if err != nil {
-			return nil, false, nil, err
-		}
-		rent, err := money(row, rentCol, rowIdx)
-		if err != nil {
-			return nil, false, nil, err
+		var amounts [model.NumAdjustments]*model.Money
+		for a, col := range amountCols {
+			if amounts[a], err = money(row, col, rowIdx); err != nil {
+				return nil, false, nil, err
+			}
 		}
 
 		if strings.Contains(strings.ToLower(name), "по умолчанию") {
-			if fee != nil {
-				d.DefaultFee = *fee
-			}
-			if rent != nil {
-				d.DefaultRent = *rent
+			for a, m := range amounts {
+				if m != nil {
+					d.Defaults[a] = *m
+				}
 			}
 			continue
 		}
@@ -163,7 +173,7 @@ func LoadDrivers(path string) (d *Drivers, found bool, warnings []string, err er
 		if _, dup := d.entries[key]; dup {
 			warnings = append(warnings, fmt.Sprintf("%s: водитель «%s» указан несколько раз, берётся последняя строка", path, name))
 		}
-		d.entries[key] = entry{fee: fee, rent: rent, exclude: isYes(cell(row, exclCol))}
+		d.entries[key] = entry{amounts: amounts, exclude: isYes(cell(row, exclCol))}
 
 		main := strings.Join(strings.Fields(name), " ")
 		for _, alias := range splitAliases(cell(row, aliasCol)) {
@@ -237,11 +247,22 @@ func WriteDriversTemplate(path string, defaultFee model.Money) error {
 	if err := f.SetSheetName("Sheet1", sheet); err != nil {
 		return err
 	}
-	_ = f.SetSheetRow(sheet, "A1", &[]any{HeaderName, HeaderFee, HeaderRent, HeaderExclude, HeaderAliases})
-	_ = f.SetSheetRow(sheet, "A2", &[]any{DefaultRowName, defaultFee.Float(), 0})
+	header := []any{HeaderName}
+	defaults := []any{DefaultRowName}
+	for a, c := range amountColumns {
+		header = append(header, c.header)
+		if model.Adjustment(a) == model.PartnerFee {
+			defaults = append(defaults, defaultFee.Float())
+		} else {
+			defaults = append(defaults, 0)
+		}
+	}
+	header = append(header, HeaderExclude, HeaderAliases)
+	_ = f.SetSheetRow(sheet, "A1", &header)
+	_ = f.SetSheetRow(sheet, "A2", &defaults)
 	_ = f.SetColWidth(sheet, "A", "A", 30)
-	_ = f.SetColWidth(sheet, "B", "D", 18)
-	_ = f.SetColWidth(sheet, "E", "E", 40)
+	_ = f.SetColWidth(sheet, "B", "H", 18)
+	_ = f.SetColWidth(sheet, "I", "I", 40)
 	style, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true}})
 	_ = f.SetRowStyle(sheet, 1, 1, style)
 	_ = f.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})

@@ -59,3 +59,18 @@ func ParseWeek(s string) (Week, error) {
 func (w Week) String() string {
 	return w.Start.Format("2006-01-02") + " – " + w.End.Format("2006-01-02")
 }
+
+// Adjustment is a per-driver weekly amount set in drivers.xlsx
+// (default value plus per-driver overrides).
+type Adjustment int
+
+// Adjustments in report column order (E–J).
+const (
+	PartnerFee Adjustment = iota
+	CarRent
+	Bonus
+	ZUS
+	Debt
+	Terminal
+	NumAdjustments
+)
