@@ -65,6 +65,45 @@ func TestFetchAndFind(t *testing.T) {
 	}
 }
 
+func TestFilePeriod(t *testing.T) {
+	cases := map[string]string{
+		"Zarobki na kierowcę-2026W39-The King Sp_ z o_o_.csv":                "2026-09-21 2026-09-27",
+		"Zarobki na kierowcę-2026W01-Firm (1).csv":                           "2025-12-29 2026-01-04",
+		"Zarobki_na_kierowcę_14_wrz_2026_20_wrz_2026_The_King_Sp_z_o_o_.csv": "2026-09-14 2026-09-20",
+		"Zarobki_na_kierowcę_29_wrz_2026_5_paź_2026_Firm (1).csv":            "2026-09-29 2026-10-05",
+		"Zarobki_na_kierowcę_28_gru_2026_3_sty_2027.csv":                     "2026-12-28 2027-01-03",
+		"Zarobki_na_kierowcę_14_xyz_2026_20_wrz_2026_Firm.csv":               "",
+		"report.csv": "",
+	}
+	for name, want := range cases {
+		start, end, ok := filePeriod(name)
+		got := ""
+		if ok {
+			got = start.Format("2006-01-02") + " " + end.Format("2006-01-02")
+		}
+		if got != want {
+			t.Errorf("filePeriod(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestFindDateRangeFile(t *testing.T) {
+	dir := t.TempDir()
+	good := filepath.Join(dir, "Zarobki_na_kierowcę_21_wrz_2026_27_wrz_2026_Firm.csv")
+	longer := filepath.Join(dir, "Zarobki_na_kierowcę_21_wrz_2026_28_wrz_2026_Firm.csv")
+	for _, p := range []string{good, longer} {
+		if err := os.WriteFile(p, []byte(sample), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, _ := FindFile(dir, week); got != good {
+		t.Errorf("FindFile = %q", got)
+	}
+	if _, err := (CSV{Path: longer}).Fetch(context.Background(), week); err == nil {
+		t.Error("expected period mismatch error")
+	}
+}
+
 func TestRealSample(t *testing.T) {
 	path := "../../../samples/Zarobki na kierowcę-2026W39-The King Sp_ z o_o_.csv"
 	if _, err := os.Stat(path); err != nil {

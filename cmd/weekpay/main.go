@@ -32,7 +32,7 @@ import (
 const (
 	defaultPartnerFee = 23000 // 230.00 PLN, used for the drivers.xlsx template
 	driversFileName   = "drivers.xlsx"
-	workDirName       = "Выплаты" // inside Documents
+	workDirName       = "Payouts" // inside Documents
 	shortcutName      = "Выплаты водителям.lnk"
 	appTitle          = "Выплаты водителям"
 )

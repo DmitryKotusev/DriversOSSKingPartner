@@ -21,7 +21,7 @@ go test ./...
    ```
 
    Программа создаст:
-   - рабочую папку `Документы\Выплаты`: здесь лежат `drivers.xlsx` и готовые отчёты. Другую папку можно задать: `--install --workdir D:\Выплаты`;
+   - рабочую папку `Документы\Payouts`: здесь лежат `drivers.xlsx` и готовые отчёты. Другую папку можно задать: `--install --workdir D:\Payouts`;
    - `weekpay.ini` рядом с exe, где записан путь к рабочей папке (его можно поправить в Блокноте);
    - `drivers.xlsx` в рабочей папке: копию файла, лежавшего рядом с exe или в текущей папке, а если такого нет — шаблон;
    - ярлык «Выплаты водителям» на рабочем столе.
@@ -34,7 +34,7 @@ go test ./...
    |---|---|---|
    | Uber | Fleet Hub → «Звіти» → «Створити звіт» → «Платежі (водій)» | `20260921_20260928_payments_driver_<фирма>.csv` |
    | FREE NOW | portal.free-now.com → Earnings → скачать (zip) | `earnings_2026-09-21_2026-09-27.zip` |
-   | Bolt | fleets.bolt.eu → Finanse → Zarobki na kierowcę → «Ostatni tydzień» → Pobierz | `Zarobki na kierowcę-2026W39-<фирма>.csv` |
+   | Bolt | fleets.bolt.eu → Finanse → Zarobki na kierowcę → «Ostatni tydzień» → Pobierz | `Zarobki na kierowcę-2026W39-<фирма>.csv`; за произвольный период — `Zarobki_na_kierowcę_21_wrz_2026_27_wrz_2026_<фирма>.csv` |
 
 2. Дважды щёлкните ярлык «Выплаты водителям». Программа:
    - берёт прошедшую неделю (пн–вс);
@@ -67,7 +67,7 @@ go test ./...
 | Флаг | Назначение |
 |---|---|
 | `--week 2026-09-21` | другая неделя (подходит любой её день) |
-| `--workdir <папка>` | рабочая папка (по умолчанию из `weekpay.ini`, иначе `Документы\Выплаты`) |
+| `--workdir <папка>` | рабочая папка (по умолчанию из `weekpay.ini`, иначе `Документы\Payouts`) |
 | `--downloads <папка>` | где искать файлы (по умолчанию из `weekpay.ini`, иначе «Загрузки») |
 | `--uber-csv`, `--freenow-csv`, `--bolt-csv <файл>` | указать файл явно |
 | `--drivers <файл>` | путь к таблице водителей |
@@ -80,7 +80,7 @@ go test ./...
 `weekpay.ini` (рядом с exe, необязательный; относительные пути — от папки exe):
 
 ```
-workdir = C:\Users\<имя>\Documents\Выплаты
+workdir = C:\Users\<имя>\Documents\Payouts
 downloads =
 ```
 
