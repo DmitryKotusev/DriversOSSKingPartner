@@ -48,7 +48,9 @@ func FileName(w model.Week) string {
 	return fmt.Sprintf("Report_%s_%s.xlsx", w.Start.Format("2006-01-02"), w.End.Format("2006-01-02"))
 }
 
-const moneyFormat = `#,##0.00;[Red]-#,##0.00`
+// moneyFormat has no thousands separator: Excel copies the displayed text,
+// and online banking rejects amounts like "2,399.22" pasted into a transfer.
+const moneyFormat = `0.00;[Red]-0.00`
 
 // Write creates the workbook at path.
 func Write(path string, in Input) error {
